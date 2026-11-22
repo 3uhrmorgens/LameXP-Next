@@ -1,0 +1,74 @@
+name: LameXP Next - build and test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  portable-core:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++ ffmpeg lame
+      - name: Configure
+        run: cmake --preset linux-core
+      - name: Build
+        run: cmake --build --preset linux-core
+      - name: C++ tests
+        run: ctest --preset linux-core --output-on-failure
+      - name: Actual codec smoke tests
+        run: |
+          python3 tests/SmokePipeline.py
+          python3 tests/SmokeMetadata.py
+          python3 tests/SmokeStreaming.py
+  windows-x64:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt 6 for MSVC x64
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+      - name: Configure MSVC x64
+        shell: pwsh
+        run: cmake -S . -B out/build/windows-ci -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" -DBUILD_TESTING=ON
+      - name: Build
+        run: cmake --build out/build/windows-ci --config Release --parallel
+      - name: C++ tests
+        run: ctest --test-dir out/build/windows-ci -C Release --output-on-failure
+      - name: Verify Windows executable and architecture
+        shell: pwsh
+        run: |
+          $exe = 'out/build/windows-ci/Release/LameXPNext.exe'
+          if (!(Test-Path $exe)) { throw 'Windows application binary not found' }
+          $header = [System.IO.File]::ReadAllBytes($exe)
+          $pe = [BitConverter]::ToInt32($header, 0x3C)
+          $machine = [BitConverter]::ToUInt16($header, $pe + 4)
+          if ($machine -ne 0x8664) { throw "Unexpected PE machine type: $machine" }
+          Write-Host 'Verified PE32+ AMD64 executable'
+      - name: Create Qt runtime package (codecs not included)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item out/build/windows-ci/Release/LameXPNext.exe dist/
+          windeployqt --release --no-translations dist/LameXPNext.exe
+          Copy-Item README.md dist/
+          Compress-Archive -Path dist/* -DestinationPath LameXPNext-0.8-win-x64-qt-only.zip -Force
+      - name: Prepare offscreen Qt startup smoke test
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $exe = 'dist/LameXPNext.exe'
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 3
+          if ($p.HasExited) { throw "Qt application exited immediately ($($p.ExitCode))" }
+          Stop-Process -Id $p.Id -Force
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LameXPNext-0.8-win-x64-qt-only
+          path: LameXPNext-0.8-win-x64-qt-only.zip
