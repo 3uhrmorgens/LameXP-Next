@@ -2,6 +2,7 @@
 #include "core/ResourcePolicy.h"
 #include "core/OutputNaming.h"
 #include <QProcess>
+#include <QCoreApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -29,16 +30,19 @@
 #include <algorithm>
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), manager_(this) {
-    setWindowTitle(QStringLiteral("LameXP Next — Migration Prototype 0.7"));
+    setWindowTitle(QStringLiteral("LameXP Next — Portable Prototype 0.9"));
     resize(880, 560);
     auto* base = new QWidget(this);
     auto* layout = new QVBoxLayout(base);
     auto* headline = new QLabel(QStringLiteral("LameXP Next  ·  Konvertierungsprototyp"), base);
     QFont font = headline->font(); font.setPointSize(17); font.setBold(true); headline->setFont(font);
     layout->addWidget(headline);
-    layout->addWidget(new QLabel(QStringLiteral("Externer FFmpeg-Codecadapter (selbst bereitzustellen). Keine Original-Codecs enthalten."), base));
+    layout->addWidget(new QLabel(QStringLiteral("Portabler Codec-Betrieb: FFmpeg und FFprobe werden im codecs-Ordner automatisch erkannt."), base));
     auto* exeRow = new QHBoxLayout();
-    executable_ = new QLineEdit(QStandardPaths::findExecutable(QStringLiteral("ffmpeg")), base);
+    const QString localCodec = QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("codecs/ffmpeg.exe"));
+    const QString portableCodec = QFileInfo(localCodec).isExecutable() ? localCodec : QString{};
+    const QString systemCodec = QStandardPaths::findExecutable(QStringLiteral("ffmpeg"));
+    executable_ = new QLineEdit(!portableCodec.isEmpty() ? portableCodec : systemCodec, base);
     executable_->setPlaceholderText(QStringLiteral("Vollständiger Pfad zu ffmpeg.exe"));
     nativeLame_ = new QCheckBox(QStringLiteral("Direktes LAME für MP3 (FFmpeg → PCM-Pipe → LAME)"), base);
     nativeLame_->setToolTip(QStringLiteral("Benötigt lame.exe neben ffmpeg.exe. Überträgt PCM direkt per Pipe; Tags und erkanntes Cover werden anschließend übernommen."));
@@ -225,7 +229,7 @@ void MainWindow::previewNames() {
 void MainWindow::startJobs() {
     const QString executable=executable_->text().trimmed();
     if(!QFileInfo(executable).isFile() || !QFileInfo(executable).isExecutable()) {
-        QMessageBox::warning(this,QStringLiteral("Encoder fehlt"),QStringLiteral("Bitte eine gültige ffmpeg.exe auswählen.")); return;
+        QMessageBox::warning(this,QStringLiteral("Encoder fehlt"),QStringLiteral("Keine ffmpeg.exe gefunden. Prüfe codecs/ffmpeg.exe im Programmordner oder wähle sie manuell.")); return;
     }
     const auto dir=chooseOutputDir(); if(dir.isEmpty()) return;
     const bool useLame=nativeLame_->isChecked() && format_->currentData().toString()==QStringLiteral("mp3");

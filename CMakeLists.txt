@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(LameXPNext VERSION 0.8.0 LANGUAGES CXX)
+project(LameXPNext VERSION 0.9.0 LANGUAGES CXX)
 option(LAMEXP_CORE_ONLY "Build portable C++ core/tests without Qt GUI" OFF)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
