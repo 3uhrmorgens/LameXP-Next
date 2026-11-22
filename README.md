@@ -1,29 +1,32 @@
-# LameXP Next
+# LameXP Next v0.8 — GitHub onboarding / Windows CI preparation
 
-Modernisierungsprojekt für einen Audio-Konverter unter Windows 10/11 (x64).
+**Source prototype; no Windows build has yet been executed.** Builds must be confirmed by GitHub Actions after importing the project.
 
-> **Aktueller Status:** Entwicklungsprototyp. Der lokale v0.7-Quellcode ist noch nicht vollständig in dieses GitHub-Repository importiert. **Es gibt noch keinen erfolgreich geprüften Windows-x64-Build.**
+- Builds on v0.7 (C++20, Qt 6, FFmpeg/LAME process pipeline, metadata scanning and output naming).
+- CI fix: deploy Qt plugins using `windeployqt` **before** the offscreen startup smoke test.
+- The Windows CI artifact is only uploaded if the preceding Windows build, tests and GUI smoke test pass. Codec executables are not bundled.
+- Tests rerun under Linux: four C++ core tests, three external audio smoke scripts. All passed in the local environment.
+- The original upstream LameXP/MUtilities source tree is still not fully imported or migrated. Check copyright and license obligations before publishing binary distributions.
 
-## Projektziel
+## Import into GitHub
 
-- C++20, CMake, Qt 6 (zunächst Widgets)
-- Modulare Audioverarbeitung mit FFmpeg/ffprobe und LAME
-- Direkte PCM-Streaming-Pipeline statt temporärer großer WAV-Dateien
-- Sichere Metadatenübernahme inkl. Coverbilder
-- Batch-Konvertierung und dateinamen-/ordnerbasierte Metadatenmuster
-- Begrenzte Parallelisierung, asynchrone Metadatenanalyse
-- Nachweisbar getestete Windows-x64-Artefakte mit GitHub Actions
+Repository: https://github.com/3uhrmorgens/LameXP-Next
 
-## Nächster Schritt
+Unzip this archive, copy **the contents** of the extracted folder into a checkout of the GitHub repository (not the outer versioned directory), keeping its `.github/workflows/build.yml` file. Commit and push.
 
-1. Den **vollständigen v0.7-Projektstand** ohne `out/`, Cache-Dateien und lokale Binärdateien importieren.
-2. Originalcode, MUtilities und Drittanbieter-Komponenten getrennt nach Herkunft und Lizenz prüfen.
-3. CMake-Core-Tests und Audio-Smoke-Tests unter Linux ausführen.
-4. MSVC 2022 + Qt 6.8.3 Build unter Windows ausführen, Buildfehler beheben.
-5. Erst nach positivem CI-Ergebnis eine Windows-Testversion als Artefakt veröffentlichen.
+Do not commit `out/`, temporary binary test outputs, local codec executables or Qt runtime DLLs.
 
-## Lizenz und Herkunft
+## Linux core verification
 
-Technische Ausgangsbasis und Referenz: [LameXP Release_421](https://sourceforge.net/p/lamexp/code/ci/Release_421/tree/). Das bisherige neue Gerüst ist **kein** vollständiger Import des Originalprojekts. Vor Übernahme von fremdem Quellcode sind dessen Copyright- und Lizenztexte beizubehalten und die jeweiligen Bedingungen zu prüfen. Die Lizenz dieses neuen Repository-Inhalts muss vor einer öffentlichen Distribution verbindlich geklärt werden.
+```sh
+cmake --preset linux-core
+cmake --build --preset linux-core
+ctest --preset linux-core --output-on-failure
+python3 tests/SmokePipeline.py
+python3 tests/SmokeMetadata.py
+python3 tests/SmokeStreaming.py
+```
 
-**Wichtig:** Die Anwesenheit dieses README bedeutet nicht, dass hier bereits eine kompilierbare Anwendung liegt.
+## Windows
+
+The workflow `.github/workflows/build.yml` is designed for GitHub-hosted Windows 2022 / MSVC + Qt 6.8.3. Until it runs successfully, do not claim the Windows executable is tested.
