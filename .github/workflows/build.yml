@@ -50,14 +50,17 @@ jobs:
           $machine = [BitConverter]::ToUInt16($header, $pe + 4)
           if ($machine -ne 0x8664) { throw "Unexpected PE machine type: $machine" }
           Write-Host 'Verified PE32+ AMD64 executable'
-      - name: Create Qt runtime package (codecs not included)
+      - name: Create Qt runtime package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item out/build/windows-ci/Release/LameXPNext.exe dist/
           windeployqt --release --no-translations dist/LameXPNext.exe
           Copy-Item README.md dist/
-          Compress-Archive -Path dist/* -DestinationPath LameXPNext-0.8-win-x64-qt-only.zip -Force
+          Write-Host 'Qt runtime staged'
+      - name: Fetch, verify and package portable audio codecs
+        shell: pwsh
+        run: ./scripts/PackagePortableCodecs.ps1
       - name: Prepare offscreen Qt startup smoke test
         shell: pwsh
         run: |
@@ -67,8 +70,11 @@ jobs:
           Start-Sleep -Seconds 3
           if ($p.HasExited) { throw "Qt application exited immediately ($($p.ExitCode))" }
           Stop-Process -Id $p.Id -Force
+      - name: Build portable ZIP
+        shell: pwsh
+        run: Compress-Archive -Path dist/* -DestinationPath LameXPNext-0.9-win-x64-portable.zip -Force
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LameXPNext-0.8-win-x64-qt-only
+          name: LameXPNext-0.9-win-x64-portable
           path: LameXPNext-0.8-win-x64-qt-only.zip
