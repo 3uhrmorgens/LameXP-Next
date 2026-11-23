@@ -2,6 +2,15 @@
 
 Alle Versionen vor der ersten stabilen Veröffentlichung sind **Entwicklungs- und Teststände**. Änderungen werden erst nach erfolgreichem Build und – soweit relevant – Praxistest als bestätigt beschrieben.
 
+## v0.10 – Erweiterte Encoder-Steuerung (in `main` übernommen)
+
+- MP3-VBR/ABR/CBR-Modus mit auswählbarer Bitrate bzw. Qualitätsstufe.
+- Wählbare Ausgangs-Samplerate für MP3/FLAC; Opus-Samplerate wird passend vom Encoder bestimmt.
+- Vordefinierte und benutzerdefinierte Konvertierungsprofile, portable Speicherung in `LameXPNext.ini`.
+- Erfolgreicher Windows-Praxistest: MP3-CBR/ABR, Sampleraten sowie das Speichern und erneute Laden eigener Profile.
+- Automatisierte FFmpeg-/FFprobe-Integrationstests für tatsächliche Codec-, Sampleraten-, Kanal- und ausgewählte Bitratenparameter; erfolgreich im v0.10-PR-Workflow.
+- [Pull Request #3](https://github.com/3uhrmorgens/LameXP-Next/pull/3) wurde nach erfolgreichem CI-Lauf zusammengeführt.
+
 ## v0.9 – Portable Windows-x64-Teststand
 
 - GitHub-Actions-Build unter Windows mit Qt 6 und MSVC 2022 bestätigt.
@@ -19,8 +28,8 @@ Alle Versionen vor der ersten stabilen Veröffentlichung sind **Entwicklungs- un
 
 ## In Entwicklung
 
-- MP3 CBR/ABR, wählbare Samplerate und portable Konvertierungsprofile.
-- FFprobe-gestützte Integrationstests der tatsächlichen Ausgabedateien.
+- Ausführlichere automatische GUI-End-to-End-Tests auf Windows.
+- Zusätzliche Regressionstests, Fehlerbehandlung und Kompatibilitätsprüfungen.
 
 ## Frühere Prototypen v0.1–v0.8
 
