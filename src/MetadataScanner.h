@@ -15,6 +15,7 @@ public:
     struct Result {
         lamexp::core::Tags tags;
         bool attachedCover = false;
+        bool hasAudio = false;
         QString error;
     };
     explicit MetadataScanner(QObject* parent = nullptr);
