@@ -27,11 +27,16 @@
 #include <QStatusBar>
 #include <QStandardPaths>
 #include <QThread>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
+#include <QUrl>
 #include <algorithm>
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), manager_(this) {
-    setWindowTitle(QStringLiteral("LameXP Next — Portable Prototype 0.9"));
-    resize(880, 560);
+    setWindowTitle(QStringLiteral("LameXP Next — Portable Prototype 0.9.1"));
+    resize(920, 680);
+    setAcceptDrops(true);
     auto* base = new QWidget(this);
     auto* layout = new QVBoxLayout(base);
     auto* headline = new QLabel(QStringLiteral("LameXP Next  ·  Konvertierungsprototyp"), base);
@@ -54,6 +59,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), manager_(this) {
     exeRow->addWidget(executable_); exeRow->addWidget(browseExe); layout->addLayout(exeRow); layout->addWidget(nativeLame_);
     files_ = new QListWidget(base); files_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     layout->addWidget(files_);
+    files_->setToolTip(QStringLiteral("Audiodateien hierher ziehen oder über die Schaltfläche hinzufügen."));
     auto* row = new QHBoxLayout();
     auto* add = new QPushButton(QStringLiteral("Dateien hinzufügen"), base);
     auto* clear = new QPushButton(QStringLiteral("Liste leeren"), base);
@@ -67,6 +73,35 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), manager_(this) {
     row->addWidget(add); row->addWidget(clear); row->addStretch(); row->addWidget(format_);
     row->addWidget(new QLabel(QStringLiteral("Jobs parallel:"), base)); row->addWidget(workers_);
     layout->addLayout(row);
+    auto* paramsRow = new QHBoxLayout();
+    paramsRow->addWidget(new QLabel(QStringLiteral("MP3-VBR:"), base));
+    mp3Quality_ = new QComboBox(base);
+    for (int q = 0; q <= 9; ++q) mp3Quality_->addItem(QStringLiteral("Qualität %1").arg(q), q);
+    mp3Quality_->setCurrentIndex(2);
+    mp3Quality_->setToolTip(QStringLiteral("FFmpeg libmp3lame -q:a; VBR 0 = höchste Qualität, 9 = kleinste Datei. Keine feste Bitrate."));
+    paramsRow->addWidget(mp3Quality_);
+    paramsRow->addWidget(new QLabel(QStringLiteral("Opus:"), base));
+    opusBitrate_ = new QComboBox(base);
+    for (const int kbps : {64, 96, 128, 160, 192, 256, 320})
+        opusBitrate_->addItem(QStringLiteral("%1 kbit/s").arg(kbps), kbps);
+    opusBitrate_->setCurrentIndex(2);
+    paramsRow->addWidget(opusBitrate_);
+    paramsRow->addWidget(new QLabel(QStringLiteral("Kanäle:"), base));
+    channelMode_ = new QComboBox(base);
+    channelMode_->addItem(QStringLiteral("Original"), 0);
+    channelMode_->addItem(QStringLiteral("Mono"), 1);
+    channelMode_->addItem(QStringLiteral("Stereo"), 2);
+    paramsRow->addWidget(channelMode_);
+    layout->addLayout(paramsRow);
+    parameters_ = new QLabel(base);
+    parameters_->setWordWrap(true);
+    layout->addWidget(parameters_);
+    connect(format_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this] { updateParameterSummary(); });
+    connect(mp3Quality_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this] { updateParameterSummary(); });
+    connect(opusBitrate_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this] { updateParameterSummary(); });
+    connect(channelMode_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this] { updateParameterSummary(); });
+    connect(nativeLame_, &QCheckBox::toggled, this, [this] { updateParameterSummary(); });
+    updateParameterSummary();
     autoNames_ = new QCheckBox(QStringLiteral("Ausgabedateien automatisch anhand von Metadaten benennen"), base);
     namePattern_ = new QLineEdit(QStringLiteral("{artist} - {album} - {track:02} - {title}"), base);
     namePattern_->setPlaceholderText(QStringLiteral("z.B. {artist} - {album} - {track:02} - {title}"));
@@ -104,7 +139,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), manager_(this) {
         status_->setText(QStringLiteral("Analysiere Metadaten: %1 / %2").arg(done).arg(total));
     });
     connect(&scanner_, &MetadataScanner::completed, this, [this](const QStringList& errors) {
-        if (!errors.isEmpty()) QMessageBox::warning(this, QStringLiteral("Metadatenanalyse"), errors.join(QStringLiteral("\n")));
+        if (!errors.isEmpty()) QMessageBox::warning(this, QStringLiteral("Dateiprüfung"), errors.join(QStringLiteral("\n")));
         finishPreparation();
     });
     connect(stop, &QPushButton::clicked, &manager_, &JobManager::cancelAll);
@@ -115,11 +150,57 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), manager_(this) {
         statusBar()->showMessage(QFileInfo(source).fileName() + (ok ? QStringLiteral(" abgeschlossen") : QStringLiteral(" fehlgeschlagen: ") + detail), 12000);
     });
 }
-void MainWindow::addFiles() {
-    const auto paths = QFileDialog::getOpenFileNames(this, QStringLiteral("Audiodateien hinzufügen"));
-    for (const auto& path : paths) {
-        if (files_->findItems(path, Qt::MatchExactly).isEmpty()) files_->addItem(path);
+void MainWindow::updateParameterSummary() {
+    const QString format = format_->currentData().toString();
+    const bool mp3 = format == QStringLiteral("mp3");
+    mp3Quality_->setEnabled(mp3);
+    opusBitrate_->setEnabled(format == QStringLiteral("opus"));
+    nativeLame_->setEnabled(mp3);
+    const QString channels = channelMode_->currentData().toInt() == 0 ? QStringLiteral("Kanäle beibehalten")
+        : channelMode_->currentData().toInt() == 1 ? QStringLiteral("Mono (1 Kanal)")
+        : QStringLiteral("Stereo (2 Kanäle)");
+    QString details;
+    if (mp3) {
+        details = QStringLiteral("MP3 · libmp3lame · VBR -q:a %1 (variable Bitrate)")
+            .arg(mp3Quality_->currentData().toInt());
+        if (nativeLame_->isChecked()) details = QStringLiteral("MP3 · direkte LAME-EXE · V%1 (variable Bitrate)")
+            .arg(mp3Quality_->currentData().toInt());
+    } else if (format == QStringLiteral("opus")) {
+        details = QStringLiteral("Opus · libopus · %1 kbit/s Zielbitrate").arg(opusBitrate_->currentData().toInt());
+    } else {
+        details = QStringLiteral("FLAC · verlustfrei · keine feste Zielbitrate");
     }
+    parameters_->setText(QStringLiteral("Konvertierungsparameter: %1 · %2 · Samplerate: Quelle")
+        .arg(details, channels));
+}
+void MainWindow::addInputPaths(const QStringList& paths) {
+    int rejected = 0;
+    for (const auto& path : paths) {
+        const QFileInfo file(path);
+        if (!file.isFile() || !file.isReadable()) { ++rejected; continue; }
+        if (files_->findItems(file.absoluteFilePath(), Qt::MatchExactly).isEmpty())
+            files_->addItem(file.absoluteFilePath());
+    }
+    if (rejected) QMessageBox::information(this, QStringLiteral("Dateien übersprungen"),
+        QStringLiteral("%1 Einträge sind keine lesbaren Dateien.").arg(rejected));
+}
+void MainWindow::addFiles() {
+    addInputPaths(QFileDialog::getOpenFileNames(this, QStringLiteral("Audiodateien hinzufügen")));
+}
+void MainWindow::dragEnterEvent(QDragEnterEvent* event) {
+    if (event->mimeData()->hasUrls()) {
+        for (const auto& url : event->mimeData()->urls()) {
+            if (url.isLocalFile()) { event->acceptProposedAction(); return; }
+        }
+    }
+    event->ignore();
+}
+void MainWindow::dropEvent(QDropEvent* event) {
+    QStringList paths;
+    for (const auto& url : event->mimeData()->urls())
+        if (url.isLocalFile()) paths << url.toLocalFile();
+    addInputPaths(paths);
+    event->acceptProposedAction();
 }
 namespace {
 QString foldPath(const QString& path) {return QDir::cleanPath(QFileInfo(path).absoluteFilePath()).toCaseFolded();}
@@ -129,7 +210,7 @@ QString MainWindow::ffprobePath() const {
 }
 void MainWindow::prepare(bool start) {
     if (scanner_.busy()) { status_->setText(QStringLiteral("Analyse läuft bereits …")); return; }
-    const bool needsTags = autoNames_->isChecked() || autoFolders_->isChecked() || format_->currentData().toString() == QStringLiteral("mp3");
+    const bool needsTags = true; // Always validate an actual audio stream, regardless of extension.
     if (!needsTags) {
         if (start) startJobs(); else previewNames();
         return;
@@ -170,6 +251,11 @@ QList<ConversionJob> MainWindow::plannedJobs(const QString& dir, QStringList& er
     QSet<QString> reserved;
     for(int i=0;i<files_->count();++i) {
         const auto source=files_->item(i)->text();
+        const auto scan = scanner_.result(source);
+        if (!scan.error.isEmpty() || !scan.hasAudio) {
+            errors << QFileInfo(source).fileName() + QStringLiteral(": Keine konvertierbare Audiospur gefunden.");
+            continue;
+        }
         QString stem=QFileInfo(source).completeBaseName();
         const auto tags = (autoNames_->isChecked() || autoFolders_->isChecked())
             ? scanner_.result(source).tags : lamexp::core::Tags{};
@@ -203,6 +289,9 @@ QList<ConversionJob> MainWindow::plannedJobs(const QString& dir, QStringList& er
         reserved.insert(foldPath(destination));
         lamexp::core::PipelineOptions options;
         options.useNativeLame=useLame;
+        options.mp3VbrQuality=mp3Quality_->currentData().toInt();
+        options.opusBitrateKbps=opusBitrate_->currentData().toInt();
+        options.outputChannels=channelMode_->currentData().toInt();
         if(codec==QStringLiteral("mp3")) {
             // Determine whether an attached picture exists, not simply any video stream.
             options.hasAttachedCover=scanner_.result(source).attachedCover;
