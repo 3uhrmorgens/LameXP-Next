@@ -1,7 +1,11 @@
 #include "PipelinePlan.h"
+#include <algorithm>
 namespace lamexp::core {
 PipelinePlan planPipeline(const PipelineOptions& opts) {
     PipelinePlan plan;
+    const auto mp3Quality = std::clamp(opts.mp3VbrQuality, 0, 9);
+    const auto opusRate = std::clamp(opts.opusBitrateKbps, 32, 320);
+    const int channels = opts.outputChannels == 1 || opts.outputChannels == 2 ? opts.outputChannels : 0;
     if (opts.format == OutputFormat::MP3 && opts.useNativeLame) {
         // A bounded OS pipe sends WAV-encoded PCM directly from FFmpeg to LAME.
         // Metadata is NOT transparently preserved by a WAV intermediate.
@@ -10,7 +14,15 @@ PipelinePlan planPipeline(const PipelineOptions& opts) {
             "-map", "0:a:0", "-vn", "-sn", "-dn", "-map_metadata", "-1",
             "-c:a", "pcm_s16le", "-f", "wav", "pipe:1"
         }});
-        auto lameArgs = LameAdapter::arguments(opts.lame, "-", "output.mp3");
+        if (channels) {
+            auto& args = plan.steps.back().args;
+            args.insert(args.end() - 1, {"-ac", std::to_string(channels)});
+        }
+        auto settings = opts.lame;
+        settings.qualityIndex = 9 - mp3Quality; // legacy index maps 9 to V0, 0 to V9
+        if (channels == 1) settings.channelMode = ChannelMode::Mono;
+        else if (channels == 2) settings.channelMode = ChannelMode::Stereo;
+        auto lameArgs = LameAdapter::arguments(settings, "-", "output.mp3");
         lameArgs.back() = kEncoded;
         plan.steps.push_back({Backend::NativeLame, std::move(lameArgs)});
         // Lossless MP3 remux: transfer source tags and optional embedded cover.
@@ -31,10 +43,11 @@ PipelinePlan planPipeline(const PipelineOptions& opts) {
         "-hide_banner", "-nostdin", "-loglevel", "error", "-n", "-i", kSource,
         "-map", "0:a:0", "-sn", "-dn", "-map_metadata", "0"
     };
+    if (channels) args.insert(args.end(), {"-ac", std::to_string(channels)});
     if (opts.format == OutputFormat::MP3) {
-        args.insert(args.end(), {"-c:a", "libmp3lame", "-q:a", "2", "-id3v2_version", "3"});
+        args.insert(args.end(), {"-c:a", "libmp3lame", "-q:a", std::to_string(mp3Quality), "-id3v2_version", "3"});
     } else if (opts.format == OutputFormat::Opus) {
-        args.insert(args.end(), {"-c:a", "libopus", "-b:a", "128k"});
+        args.insert(args.end(), {"-c:a", "libopus", "-b:a", std::to_string(opusRate) + "k"});
     } else {
         args.insert(args.end(), {"-c:a", "flac"});
     }
