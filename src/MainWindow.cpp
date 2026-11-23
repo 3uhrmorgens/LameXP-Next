@@ -145,6 +145,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), manager_(this) {
     profileRow->addWidget(deleteProfile);
     layout->addLayout(profileRow);
     auto apply = [this](const QVariantMap& profile) {
+        applyingProfile_ = true;
         auto select = [](QComboBox* box, const QVariant& value) {
             const int index = box->findData(value);
             if (index >= 0) box->setCurrentIndex(index);
@@ -156,6 +157,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), manager_(this) {
         select(opusBitrate_, profile.value(QStringLiteral("opusBitrate")));
         select(channelMode_, profile.value(QStringLiteral("channels")));
         select(sampleRate_, profile.value(QStringLiteral("sampleRate")));
+        applyingProfile_ = false;
         updateParameterSummary();
     };
     connect(profiles_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this, apply](int) {
@@ -235,6 +237,14 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), manager_(this) {
     connect(channelMode_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this] { updateParameterSummary(); });
     connect(nativeLame_, &QCheckBox::toggled, this, [this] { updateParameterSummary(); });
     updateParameterSummary();
+    // A manual edit must not leave a saved preset displayed as though it still matched.
+    const auto markCustom = [this](int) {
+        if (!applyingProfile_ && profiles_->currentData().toString() != QStringLiteral("custom"))
+            profiles_->setCurrentIndex(0);
+    };
+    for (QComboBox* control : {format_, mp3RateMode_, mp3Quality_, mp3Bitrate_,
+                               opusBitrate_, channelMode_, sampleRate_})
+        connect(control, QOverload<int>::of(&QComboBox::currentIndexChanged), this, markCustom);
     autoNames_ = new QCheckBox(QStringLiteral("Ausgabedateien automatisch anhand von Metadaten benennen"), base);
     namePattern_ = new QLineEdit(QStringLiteral("{artist} - {album} - {track:02} - {title}"), base);
     namePattern_->setPlaceholderText(QStringLiteral("z.B. {artist} - {album} - {track:02} - {title}"));
