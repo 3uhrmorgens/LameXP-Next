@@ -8,13 +8,19 @@ Alle Versionen vor der ersten stabilen Veröffentlichung sind **Entwicklungs- un
 - Portable Paketierung mit FFmpeg und FFprobe vorbereitet und erfolgreich in CI getestet.
 - Automatische Suche nach `codecs/ffmpeg.exe`.
 - Windows-Praxistests: WAV → FLAC, MP3, Opus; FLAC → MP3; metadatenbasierte Benennung erfolgreich.
-- Bekanntes Problem: Upload-Pfad des v0.9-ZIP im Workflow auf `main` muss noch korrigiert werden, damit neue Actions-Läufe stets ein Artefakt liefern.
+- GitHub-Actions-Upload-Pfad für das portable ZIP im Entwicklungsbranch korrigiert und in `main` übernommen.
 
-## In Entwicklung (noch nicht Teil des bestätigten v0.9-Teststands)
+## v0.9.1 – Bedienungsverbesserungen (in `main` übernommen)
 
-- Drag & Drop, Prüfung tatsächlicher Audiospuren und verständliche Ablehnung ungeeigneter Dateien.
-- UI-Anzeige und Auswahl von MP3-VBR-Qualität, Opus-Bitrate und Kanalmodus.
-- Siehe [Pull Request #2](https://github.com/3uhrmorgens/LameXP-Next/pull/2).
+- Drag & Drop aus dem Explorer; im Windows-Praxistest bestätigt.
+- FFprobe-Prüfung auf Audiospuren; JPG-Ablehnung mit verständlicher Fehlermeldung getestet.
+- MP3-VBR-Qualitätswahl, Opus-Zielbitrate sowie Mono-/Stereo-Ausgabe: Bedienung und Mono-/Stereo-Konvertierung im Praxistest bestätigt.
+- [Pull Request #2](https://github.com/3uhrmorgens/LameXP-Next/pull/2) wurde in `main` zusammengeführt.
+
+## In Entwicklung
+
+- MP3 CBR/ABR, wählbare Samplerate und portable Konvertierungsprofile.
+- FFprobe-gestützte Integrationstests der tatsächlichen Ausgabedateien.
 
 ## Frühere Prototypen v0.1–v0.8
 
