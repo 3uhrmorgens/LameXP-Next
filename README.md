@@ -2,11 +2,11 @@
 
 **Portabler Audio-Konverter für Windows 10/11 (x64) – Entwicklungsprojekt auf Basis von C++20 und Qt 6.**
 
-> **Aktueller Stand: v0.9 (Testversion).** Ein Windows-x64-Build und erste Konvertierungen wurden erfolgreich getestet. Die Anwendung ist noch keine abschließend getestete oder als offizielles Release freigegebene Version.
+> **Aktueller Stand: v0.9.1 (Testversion).** Ein Windows-x64-Build und erste Konvertierungen wurden erfolgreich getestet. Die Anwendung ist noch keine abschließend getestete oder als offizielles Release freigegebene Version.
 
 LameXP Next ist ein Modernisierungs- und Fork-Projekt, das sich am ursprünglichen [LameXP Release_421](https://sourceforge.net/p/lamexp/code/ci/Release_421/tree/) orientiert. Der Originalquellcode und MUtilities wurden noch **nicht vollständig portiert**. LameXP Next befindet sich daher weiterhin in Entwicklung.
 
-## Funktionen (v0.9)
+## Funktionen (v0.9.1)
 
 - Konvertierung zwischen mehreren Audioformaten, derzeit insbesondere **WAV, FLAC, MP3 und Opus**
 - **Portables Windows-x64-Paket** mit Qt-Laufzeitkomponenten und FFmpeg/FFprobe
