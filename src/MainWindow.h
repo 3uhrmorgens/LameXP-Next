@@ -34,6 +34,11 @@ private:
     QListWidget* files_ = nullptr;
     QComboBox* format_ = nullptr;
     QComboBox* mp3Quality_ = nullptr;
+    QComboBox* mp3RateMode_ = nullptr;
+    QComboBox* mp3Bitrate_ = nullptr;
+    QComboBox* sampleRate_ = nullptr;
+    QComboBox* profiles_ = nullptr;
+    bool applyingProfile_ = false;
     QComboBox* opusBitrate_ = nullptr;
     QComboBox* channelMode_ = nullptr;
     QLabel* parameters_ = nullptr;

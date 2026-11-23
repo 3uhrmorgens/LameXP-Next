@@ -32,12 +32,15 @@
 #include <QDropEvent>
 #include <QMimeData>
 #include <QEvent>
+#include <QSettings>
+#include <QInputDialog>
+#include <QRegularExpression>
 #include <QUrl>
 #include <algorithm>
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), manager_(this) {
-    setWindowTitle(QStringLiteral("LameXP Next — Portable Prototype 0.9.1"));
-    resize(920, 680);
+    setWindowTitle(QStringLiteral("LameXP Next — Portable Prototype 0.10"));
+    resize(1010, 720);
     setAcceptDrops(true);
     auto* base = new QWidget(this);
     auto* layout = new QVBoxLayout(base);
@@ -80,6 +83,18 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), manager_(this) {
     row->addWidget(new QLabel(QStringLiteral("Jobs parallel:"), base)); row->addWidget(workers_);
     layout->addLayout(row);
     auto* paramsRow = new QHBoxLayout();
+    paramsRow->addWidget(new QLabel(QStringLiteral("MP3-Modus:"), base));
+    mp3RateMode_ = new QComboBox(base);
+    mp3RateMode_->addItem(QStringLiteral("VBR"), 0);
+    mp3RateMode_->addItem(QStringLiteral("ABR"), 1);
+    mp3RateMode_->addItem(QStringLiteral("CBR"), 2);
+    paramsRow->addWidget(mp3RateMode_);
+    paramsRow->addWidget(new QLabel(QStringLiteral("MP3-Bitrate:"), base));
+    mp3Bitrate_ = new QComboBox(base);
+    for (const int rate : {32,40,48,56,64,80,96,112,128,160,192,224,256,320})
+        mp3Bitrate_->addItem(QStringLiteral("%1 kbit/s").arg(rate), rate);
+    mp3Bitrate_->setCurrentIndex(10);
+    paramsRow->addWidget(mp3Bitrate_);
     paramsRow->addWidget(new QLabel(QStringLiteral("MP3-VBR:"), base));
     mp3Quality_ = new QComboBox(base);
     for (int q = 0; q <= 9; ++q) mp3Quality_->addItem(QStringLiteral("Qualität %1").arg(q), q);
@@ -99,15 +114,137 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), manager_(this) {
     channelMode_->addItem(QStringLiteral("Stereo"), 2);
     paramsRow->addWidget(channelMode_);
     layout->addLayout(paramsRow);
+    auto* sampleRow = new QHBoxLayout();
+    sampleRow->addWidget(new QLabel(QStringLiteral("Samplerate:"), base));
+    sampleRate_ = new QComboBox(base);
+    sampleRate_->addItem(QStringLiteral("Quelle (automatisch)"), 0);
+    sampleRate_->addItem(QStringLiteral("32.000 Hz"), 32000);
+    sampleRate_->addItem(QStringLiteral("44.100 Hz"), 44100);
+    sampleRate_->addItem(QStringLiteral("48.000 Hz"), 48000);
+    sampleRow->addWidget(sampleRate_);
+    sampleRow->addStretch();
+    layout->addLayout(sampleRow);
+    auto* profileRow = new QHBoxLayout();
+    profileRow->addWidget(new QLabel(QStringLiteral("Profil:"), base));
+    profiles_ = new QComboBox(base);
+    profiles_->addItem(QStringLiteral("Benutzerdefiniert"), QStringLiteral("custom"));
+    profiles_->addItem(QStringLiteral("MP3 VBR V2"), QStringLiteral("builtin-vbr"));
+    profiles_->addItem(QStringLiteral("MP3 CBR 320"), QStringLiteral("builtin-cbr"));
+    profiles_->addItem(QStringLiteral("MP3 ABR 192"), QStringLiteral("builtin-abr"));
+    profiles_->addItem(QStringLiteral("Opus 128"), QStringLiteral("builtin-opus"));
+    profiles_->addItem(QStringLiteral("FLAC verlustfrei"), QStringLiteral("builtin-flac"));
+    QSettings portableSettings(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("LameXPNext.ini")), QSettings::IniFormat);
+    portableSettings.beginGroup(QStringLiteral("profiles"));
+    for (const QString& name : portableSettings.childKeys())
+        profiles_->addItem(name, QStringLiteral("user:") + name);
+    portableSettings.endGroup();
+    auto* saveProfile = new QPushButton(QStringLiteral("Profil speichern"), base);
+    auto* deleteProfile = new QPushButton(QStringLiteral("Profil löschen"), base);
+    profileRow->addWidget(profiles_, 1);
+    profileRow->addWidget(saveProfile);
+    profileRow->addWidget(deleteProfile);
+    layout->addLayout(profileRow);
+    auto apply = [this](const QVariantMap& profile) {
+        applyingProfile_ = true;
+        auto select = [](QComboBox* box, const QVariant& value) {
+            const int index = box->findData(value);
+            if (index >= 0) box->setCurrentIndex(index);
+        };
+        select(format_, profile.value(QStringLiteral("format")));
+        select(mp3RateMode_, profile.value(QStringLiteral("rateMode")));
+        select(mp3Quality_, profile.value(QStringLiteral("vbr")));
+        select(mp3Bitrate_, profile.value(QStringLiteral("mp3Bitrate")));
+        select(opusBitrate_, profile.value(QStringLiteral("opusBitrate")));
+        select(channelMode_, profile.value(QStringLiteral("channels")));
+        select(sampleRate_, profile.value(QStringLiteral("sampleRate")));
+        applyingProfile_ = false;
+        updateParameterSummary();
+    };
+    connect(profiles_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this, apply](int) {
+        const QString id = profiles_->currentData().toString();
+        if (id == QStringLiteral("custom")) return;
+        QVariantMap profile{{QStringLiteral("rateMode"),0}, {QStringLiteral("vbr"),2},
+                            {QStringLiteral("mp3Bitrate"),192}, {QStringLiteral("opusBitrate"),128},
+                            {QStringLiteral("channels"),0}, {QStringLiteral("sampleRate"),0}};
+        if (id == QStringLiteral("builtin-vbr")) profile[QStringLiteral("format")] = QStringLiteral("mp3");
+        else if (id == QStringLiteral("builtin-cbr")) {
+            profile[QStringLiteral("format")] = QStringLiteral("mp3");
+            profile[QStringLiteral("rateMode")] = 2;
+            profile[QStringLiteral("mp3Bitrate")] = 320;
+        } else if (id == QStringLiteral("builtin-abr")) {
+            profile[QStringLiteral("format")] = QStringLiteral("mp3");
+            profile[QStringLiteral("rateMode")] = 1;
+        } else if (id == QStringLiteral("builtin-opus")) profile[QStringLiteral("format")] = QStringLiteral("opus");
+        else if (id == QStringLiteral("builtin-flac")) profile[QStringLiteral("format")] = QStringLiteral("flac");
+        else if (id.startsWith(QStringLiteral("user:"))) {
+            QSettings settings(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("LameXPNext.ini")), QSettings::IniFormat);
+            profile = settings.value(QStringLiteral("profiles/") + id.mid(5)).toMap();
+        }
+        apply(profile);
+    });
+    connect(saveProfile, &QPushButton::clicked, this, [this] {
+        bool ok = false;
+        const QString name = QInputDialog::getText(this, QStringLiteral("Konvertierungsprofil"),
+            QStringLiteral("Profilname:"), QLineEdit::Normal, {}, &ok).trimmed();
+        if (!ok || name.isEmpty()) return;
+        if (!QRegularExpression(QStringLiteral("^[\\p{L}\\p{N} _-]{1,50}$")).match(name).hasMatch()) {
+            QMessageBox::warning(this, QStringLiteral("Ungültiger Profilname"),
+                QStringLiteral("Bitte höchstens 50 Buchstaben, Zahlen, Leerzeichen, Bindestriche oder Unterstriche eingeben."));
+            return;
+        }
+        QSettings settings(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("LameXPNext.ini")), QSettings::IniFormat);
+        const QVariantMap profile{
+            {QStringLiteral("format"), format_->currentData()},
+            {QStringLiteral("rateMode"), mp3RateMode_->currentData()},
+            {QStringLiteral("vbr"), mp3Quality_->currentData()},
+            {QStringLiteral("mp3Bitrate"), mp3Bitrate_->currentData()},
+            {QStringLiteral("opusBitrate"), opusBitrate_->currentData()},
+            {QStringLiteral("channels"), channelMode_->currentData()},
+            {QStringLiteral("sampleRate"), sampleRate_->currentData()}};
+        settings.setValue(QStringLiteral("profiles/") + name, profile);
+        settings.sync();
+        if (settings.status() != QSettings::NoError) {
+            QMessageBox::warning(this, QStringLiteral("Profil konnte nicht gespeichert werden"),
+                QStringLiteral("Der Programmordner ist möglicherweise nicht beschreibbar."));
+            return;
+        }
+        const QString id = QStringLiteral("user:") + name;
+        int index = profiles_->findData(id);
+        if (index < 0) { profiles_->addItem(name, id); index = profiles_->count()-1; }
+        profiles_->setCurrentIndex(index);
+    });
+    connect(deleteProfile, &QPushButton::clicked, this, [this] {
+        const QString id = profiles_->currentData().toString();
+        if (!id.startsWith(QStringLiteral("user:"))) {
+            QMessageBox::information(this, QStringLiteral("Profil löschen"),
+                QStringLiteral("Vordefinierte Profile können nicht gelöscht werden."));
+            return;
+        }
+        QSettings settings(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("LameXPNext.ini")), QSettings::IniFormat);
+        settings.remove(QStringLiteral("profiles/") + id.mid(5));
+        profiles_->removeItem(profiles_->currentIndex());
+        profiles_->setCurrentIndex(0);
+    });
     parameters_ = new QLabel(base);
     parameters_->setWordWrap(true);
     layout->addWidget(parameters_);
     connect(format_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this] { updateParameterSummary(); });
     connect(mp3Quality_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this] { updateParameterSummary(); });
+    connect(mp3RateMode_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this] { updateParameterSummary(); });
+    connect(mp3Bitrate_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this] { updateParameterSummary(); });
+    connect(sampleRate_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this] { updateParameterSummary(); });
     connect(opusBitrate_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this] { updateParameterSummary(); });
     connect(channelMode_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this] { updateParameterSummary(); });
     connect(nativeLame_, &QCheckBox::toggled, this, [this] { updateParameterSummary(); });
     updateParameterSummary();
+    // A manual edit must not leave a saved preset displayed as though it still matched.
+    const auto markCustom = [this](int) {
+        if (!applyingProfile_ && profiles_->currentData().toString() != QStringLiteral("custom"))
+            profiles_->setCurrentIndex(0);
+    };
+    for (QComboBox* control : {format_, mp3RateMode_, mp3Quality_, mp3Bitrate_,
+                               opusBitrate_, channelMode_, sampleRate_})
+        connect(control, QOverload<int>::of(&QComboBox::currentIndexChanged), this, markCustom);
     autoNames_ = new QCheckBox(QStringLiteral("Ausgabedateien automatisch anhand von Metadaten benennen"), base);
     namePattern_ = new QLineEdit(QStringLiteral("{artist} - {album} - {track:02} - {title}"), base);
     namePattern_->setPlaceholderText(QStringLiteral("z.B. {artist} - {album} - {track:02} - {title}"));
@@ -159,7 +296,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), manager_(this) {
 void MainWindow::updateParameterSummary() {
     const QString format = format_->currentData().toString();
     const bool mp3 = format == QStringLiteral("mp3");
-    mp3Quality_->setEnabled(mp3);
+    const int mp3Mode = mp3RateMode_->currentData().toInt();
+    mp3RateMode_->setEnabled(mp3);
+    mp3Quality_->setEnabled(mp3 && mp3Mode == 0);
+    mp3Bitrate_->setEnabled(mp3 && mp3Mode != 0);
+    sampleRate_->setEnabled(format != QStringLiteral("opus"));
     opusBitrate_->setEnabled(format == QStringLiteral("opus"));
     nativeLame_->setEnabled(mp3);
     const QString channels = channelMode_->currentData().toInt() == 0 ? QStringLiteral("Kanäle beibehalten")
@@ -167,17 +308,23 @@ void MainWindow::updateParameterSummary() {
         : QStringLiteral("Stereo (2 Kanäle)");
     QString details;
     if (mp3) {
-        details = QStringLiteral("MP3 · libmp3lame · VBR -q:a %1 (variable Bitrate)")
-            .arg(mp3Quality_->currentData().toInt());
-        if (nativeLame_->isChecked()) details = QStringLiteral("MP3 · direkte LAME-EXE · V%1 (variable Bitrate)")
-            .arg(mp3Quality_->currentData().toInt());
+        const QString mode = mp3Mode == 0
+            ? QStringLiteral("VBR Qualität %1 (variable Bitrate)").arg(mp3Quality_->currentData().toInt())
+            : QStringLiteral("%1 %2 kbit/s").arg(mp3Mode == 1 ? QStringLiteral("ABR") : QStringLiteral("CBR"))
+                .arg(mp3Bitrate_->currentData().toInt());
+        details = QStringLiteral("MP3 · %1 · %2")
+            .arg(nativeLame_->isChecked() ? QStringLiteral("direkte LAME-EXE") : QStringLiteral("libmp3lame"), mode);
     } else if (format == QStringLiteral("opus")) {
         details = QStringLiteral("Opus · libopus · %1 kbit/s Zielbitrate").arg(opusBitrate_->currentData().toInt());
     } else {
         details = QStringLiteral("FLAC · verlustfrei · keine feste Zielbitrate");
     }
-    parameters_->setText(QStringLiteral("Konvertierungsparameter: %1 · %2 · Samplerate: Quelle")
-        .arg(details, channels));
+    const QString sample = format == QStringLiteral("opus")
+        ? QStringLiteral("Opus (48 kHz)")
+        : sampleRate_->currentData().toInt() == 0 ? QStringLiteral("Quelle")
+        : QStringLiteral("%1 Hz").arg(sampleRate_->currentData().toInt());
+    parameters_->setText(QStringLiteral("Konvertierungsparameter: %1 · %2 · Samplerate: %3")
+        .arg(details, channels, sample));
 }
 void MainWindow::addInputPaths(const QStringList& paths) {
     int rejected = 0;
@@ -315,6 +462,11 @@ QList<ConversionJob> MainWindow::plannedJobs(const QString& dir, QStringList& er
         lamexp::core::PipelineOptions options;
         options.useNativeLame=useLame;
         options.mp3VbrQuality=mp3Quality_->currentData().toInt();
+        const int mode = mp3RateMode_->currentData().toInt();
+        options.mp3RateMode = mode == 1 ? lamexp::core::RateMode::ABR :
+            mode == 2 ? lamexp::core::RateMode::CBR : lamexp::core::RateMode::VBR;
+        options.mp3BitrateKbps=mp3Bitrate_->currentData().toInt();
+        options.sampleRateHz=codec==QStringLiteral("opus") ? 0 : sampleRate_->currentData().toInt();
         options.opusBitrateKbps=opusBitrate_->currentData().toInt();
         options.outputChannels=channelMode_->currentData().toInt();
         if(codec==QStringLiteral("mp3")) {

@@ -24,6 +24,9 @@ struct PipelineOptions {
     OutputFormat format = OutputFormat::MP3;
     bool useNativeLame = false;
     bool hasAttachedCover = false;
+    RateMode mp3RateMode = RateMode::VBR;
+    int mp3BitrateKbps = 192;
+    int sampleRateHz = 0; // 0 = retain input sample rate
     int mp3VbrQuality = 2; // -q:a 2 (lower = higher bitrate)
     int opusBitrateKbps = 128;
     int outputChannels = 0; // 0 = preserve, 1 = mono, 2 = stereo

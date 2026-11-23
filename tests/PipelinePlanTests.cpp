@@ -54,6 +54,27 @@ int main() {
     custom.format = OutputFormat::FLAC;
     const auto flac = planPipeline(custom);
     assert(has(flac.steps[0].args, "flac"));
+    // Extended MP3 rate control and sample rate.
+    custom.format = OutputFormat::MP3;
+    custom.mp3RateMode = RateMode::CBR;
+    custom.mp3BitrateKbps = 320;
+    custom.sampleRateHz = 44100;
+    auto cbr = planPipeline(custom);
+    assert(has(cbr.steps[0].args, "320k"));
+    assert(has(cbr.steps[0].args, "-ar"));
+    assert(has(cbr.steps[0].args, "44100"));
+    assert(!has(cbr.steps[0].args, "-q:a"));
+    custom.mp3RateMode = RateMode::ABR;
+    custom.mp3BitrateKbps = 192;
+    auto abr = planPipeline(custom);
+    assert(has(abr.steps[0].args, "-abr"));
+    assert(has(abr.steps[0].args, "192k"));
+    custom.useNativeLame = true;
+    auto nativeAbr = planPipeline(custom);
+    assert(has(nativeAbr.steps[1].args, "--abr"));
+    assert(has(nativeAbr.steps[1].args, "192"));
+    assert(has(nativeAbr.steps[0].args, "44100"));
+    custom.useNativeLame = false;
     opt.format = OutputFormat::Opus;
     plan = planPipeline(opt);
     assert(plan.steps.size() == 1);
