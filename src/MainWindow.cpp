@@ -28,8 +28,10 @@
 #include <QStandardPaths>
 #include <QThread>
 #include <QDragEnterEvent>
+#include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QMimeData>
+#include <QEvent>
 #include <QUrl>
 #include <algorithm>
 
@@ -59,6 +61,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), manager_(this) {
     exeRow->addWidget(executable_); exeRow->addWidget(browseExe); layout->addLayout(exeRow); layout->addWidget(nativeLame_);
     files_ = new QListWidget(base); files_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     layout->addWidget(files_);
+    files_->setAcceptDrops(true);
+    files_->viewport()->setAcceptDrops(true);
+    files_->installEventFilter(this);
+    files_->viewport()->installEventFilter(this);
     files_->setToolTip(QStringLiteral("Audiodateien hierher ziehen oder über die Schaltfläche hinzufügen."));
     auto* row = new QHBoxLayout();
     auto* add = new QPushButton(QStringLiteral("Dateien hinzufügen"), base);
@@ -186,6 +192,25 @@ void MainWindow::addInputPaths(const QStringList& paths) {
 }
 void MainWindow::addFiles() {
     addInputPaths(QFileDialog::getOpenFileNames(this, QStringLiteral("Audiodateien hinzufügen")));
+}
+bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
+    if (watched == files_ || watched == files_->viewport()) {
+        if (event->type() == QEvent::DragEnter || event->type() == QEvent::DragMove) {
+            auto* drag = static_cast<QDragMoveEvent*>(event);
+            if (drag->mimeData()->hasUrls()) {
+                for (const auto& url : drag->mimeData()->urls()) {
+                    if (url.isLocalFile()) { drag->acceptProposedAction(); return true; }
+                }
+            }
+        } else if (event->type() == QEvent::Drop) {
+            auto* drop = static_cast<QDropEvent*>(event);
+            QStringList paths;
+            for (const auto& url : drop->mimeData()->urls())
+                if (url.isLocalFile()) paths << url.toLocalFile();
+            if (!paths.isEmpty()) { addInputPaths(paths); drop->acceptProposedAction(); return true; }
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
 }
 void MainWindow::dragEnterEvent(QDragEnterEvent* event) {
     if (event->mimeData()->hasUrls()) {
