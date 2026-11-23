@@ -16,10 +16,13 @@ LameXP Next ist ein Modernisierungs- und Fork-Projekt, das sich am ursprünglich
 - Asynchrone Metadatenanalyse mit Cache
 - Automatische Ausgabe-Dateinamen und optionale Unterordner aus Metadaten (z. B. `{artist}/{year} - {album}`)
 - Metadaten-/Coverübernahme je nach Quell- und Zielformat
+- Drag & Drop aus dem Windows-Explorer
+- Prüfung auf Audiospuren mit verständlicher Ablehnung von Dateien ohne Audiospur (z. B. JPG)
+- Einstellbare MP3-VBR-Qualität, Opus-Zielbitrate und Mono-/Stereo-Ausgabe
 
 ### Tatsächlich überprüft
 
-Ein GitHub-Actions-Workflow hat bereits erfolgreich eine Windows-x64-Anwendung mit MSVC 2022/Qt 6 gebaut, gestartet und die Core-Tests ausgeführt. In einem Anwender-Praxistest wurden **WAV → FLAC, MP3 und Opus**, **FLAC → MP3** und die **metadatenbasierte Benennung der Ausgabedateien** erfolgreich geprüft.
+Ein GitHub-Actions-Workflow hat bereits erfolgreich eine Windows-x64-Anwendung mit MSVC 2022/Qt 6 gebaut, gestartet und die Core-Tests ausgeführt. In einem Anwender-Praxistest wurden **WAV → FLAC, MP3 und Opus**, **FLAC → MP3**, die **metadatenbasierte Benennung der Ausgabedateien**, **Drag & Drop**, **JPG-Ablehnung**, die Auswahl von **MP3-Qualität und Opus-Bitrate** sowie die **Mono-/Stereo-Ausgabe** erfolgreich geprüft.
 
 Das ist **keine** vollständige Regressionstest-Abdeckung und keine Garantie für sämtliche Formate, Dateien und Systeme.
 
@@ -29,18 +32,17 @@ Das ist **keine** vollständige Regressionstest-Abdeckung und keine Garantie fü
 - [Builds und Quellcode](https://github.com/3uhrmorgens/LameXP-Next)
 - [Entwicklung und Pull Requests](https://github.com/3uhrmorgens/LameXP-Next/pulls)
 
-Unter **Actions** einen erfolgreich abgeschlossenen Build öffnen und im Abschnitt **Artifacts** das Windows-Paket herunterladen, sofern ein solches Artefakt vorhanden ist. Für das Herunterladen von Actions-Artefakten kann eine GitHub-Anmeldung erforderlich sein. Nicht jeder erfolgreiche Workflow-Lauf enthält ein Download-Artefakt: Der Workflow in `main` benötigt noch eine Korrektur des Paket-Dateinamens im Upload-Schritt.
+Unter **Actions** einen erfolgreich abgeschlossenen Build öffnen und im Abschnitt **Artifacts** das Windows-Paket herunterladen, sofern ein solches Artefakt vorhanden ist. Für das Herunterladen von Actions-Artefakten kann eine GitHub-Anmeldung erforderlich sein. Der Upload-Schritt verwendet nun den korrekten Paketnamen; bitte bei einem konkreten Lauf prüfen, ob das Artefakt tatsächlich erstellt wurde.
 
 Das ZIP auf einem Windows-10/11-x64-System entpacken und `LameXPNext.exe` starten. Der geplante Paketaufbau enthält `codecs/ffmpeg.exe` und `codecs/ffprobe.exe`. **Nicht aus Quellcode-Snapshots eine funktionsfähige EXE ableiten**; dafür den entsprechenden Build verwenden.
 
 ## In Entwicklung
 
-- Drag & Drop von Audiodateien
-- Prüfung der tatsächlichen Audiospur und verständliche Fehlermeldungen bei ungeeigneten Eingaben (z. B. JPEG)
-- Sichtbare bzw. einstellbare Konvertierungsparameter: MP3-VBR-Qualität, Opus-Zielbitrate, Mono/Stereo
+- MP3-CBR/ABR-Bitraten, Sampleraten und portable, speicherbare Konvertierungsprofile
+- Automatisierte FFprobe-Prüfung der tatsächlichen Ausgabedatei-Parameter
 - Verbesserte Windows-End-to-End- und GUI-Tests
 
-Diese Änderungen befinden sich noch im [Draft Pull Request #2](https://github.com/3uhrmorgens/LameXP-Next/pull/2) und sind **nicht** Teil des bestätigten v0.9-Teststands.
+Die getesteten Funktionen aus [Pull Request #2](https://github.com/3uhrmorgens/LameXP-Next/pull/2) wurden in `main` übernommen. Neue Encoder-Funktionen werden gesondert entwickelt und getestet.
 
 ## Entwicklung / Architektur
 
