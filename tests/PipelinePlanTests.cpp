@@ -36,6 +36,24 @@ int main() {
     opt.hasAttachedCover = true;
     const auto coverPlan = planPipeline(opt);
     assert(has(coverPlan.steps[2].args, "attached_pic"));
+    // User-configurable encoder parameters must reach real FFmpeg arguments.
+    PipelineOptions custom;
+    custom.format = OutputFormat::MP3;
+    custom.mp3VbrQuality = 0;
+    custom.outputChannels = 1;
+    const auto mp3 = planPipeline(custom);
+    assert(has(mp3.steps[0].args, "0"));
+    assert(has(mp3.steps[0].args, "-ac"));
+    assert(has(mp3.steps[0].args, "1"));
+    custom.format = OutputFormat::Opus;
+    custom.opusBitrateKbps = 192;
+    custom.outputChannels = 2;
+    const auto opus = planPipeline(custom);
+    assert(has(opus.steps[0].args, "192k"));
+    assert(has(opus.steps[0].args, "2"));
+    custom.format = OutputFormat::FLAC;
+    const auto flac = planPipeline(custom);
+    assert(has(flac.steps[0].args, "flac"));
     opt.format = OutputFormat::Opus;
     plan = planPipeline(opt);
     assert(plan.steps.size() == 1);

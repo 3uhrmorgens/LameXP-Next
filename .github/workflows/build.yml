@@ -77,4 +77,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: LameXPNext-0.9-win-x64-portable
-          path: LameXPNext-0.8-win-x64-qt-only.zip
+          path: LameXPNext-0.9-win-x64-portable.zip
+          if-no-files-found: error

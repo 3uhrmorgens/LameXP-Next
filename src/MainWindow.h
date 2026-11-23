@@ -1,5 +1,7 @@
 #pragma once
 #include <QMainWindow>
+class QDragEnterEvent;
+class QDropEvent;
 #include "JobManager.h"
 #include "MetadataScanner.h"
 class QListWidget;
@@ -14,8 +16,14 @@ class MainWindow final : public QMainWindow {
     Q_OBJECT
 public:
     explicit MainWindow(QWidget* parent = nullptr);
+protected:
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
 private:
     void addFiles();
+    void addInputPaths(const QStringList& paths);
+    void updateParameterSummary();
     void startJobs();
     void previewNames();
     void prepare(bool start);
@@ -25,6 +33,10 @@ private:
     QList<ConversionJob> plannedJobs(const QString& dir, QStringList& errors);
     QListWidget* files_ = nullptr;
     QComboBox* format_ = nullptr;
+    QComboBox* mp3Quality_ = nullptr;
+    QComboBox* opusBitrate_ = nullptr;
+    QComboBox* channelMode_ = nullptr;
+    QLabel* parameters_ = nullptr;
     QSpinBox* workers_ = nullptr;
     QLineEdit* executable_ = nullptr;
     QCheckBox* nativeLame_ = nullptr;

@@ -40,6 +40,13 @@ MetadataScanner::Result parse(const QByteArray& bytes, QString error) {
     }
     const auto obj = doc.object();
     data.tags = parseTags(obj);
+    for (const auto stream : obj.value(QStringLiteral("streams")).toArray()) {
+        if (stream.toObject().value(QStringLiteral("codec_type")).toString() == QStringLiteral("audio")) {
+            data.hasAudio = true;
+            break;
+        }
+    }
+    if (!data.hasAudio) data.error = QStringLiteral("Keine Audiospur gefunden (keine Audiodatei).");
     // Pipeline refers to 0:v:0. Only its disposition is relevant.
     for (const auto stream : obj.value(QStringLiteral("streams")).toArray()) {
         const auto s = stream.toObject();
