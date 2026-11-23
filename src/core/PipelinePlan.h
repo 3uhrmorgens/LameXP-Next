@@ -24,6 +24,9 @@ struct PipelineOptions {
     OutputFormat format = OutputFormat::MP3;
     bool useNativeLame = false;
     bool hasAttachedCover = false;
+    int mp3VbrQuality = 2; // -q:a 2 (lower = higher bitrate)
+    int opusBitrateKbps = 128;
+    int outputChannels = 0; // 0 = preserve, 1 = mono, 2 = stereo
     LameSettings lame;
 };
 PipelinePlan planPipeline(const PipelineOptions& options);
